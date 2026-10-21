@@ -70,11 +70,11 @@ check_models() {
   local list
   list="$(ollama list 2>/dev/null || true)"
 
-  if printf '%s' "$list" | grep -q "bonsai-2-4b-96k"; then
-    ok "Bonsai 2 4B 96k (main model)"
+  if printf '%s' "$list" | grep -q "bonsai-2-4b-16k"; then
+    ok "Bonsai 2 4B 16k (main model)"
   elif printf '%s' "$list" | grep -q "bonsai-2-4b"; then
-    warn "Bonsai present without the 96k variant"
-    say "     ${DIM}See README: create it with 'ollama create bonsai-2-4b-96k'${RESET}"
+    warn "Bonsai present without the 16k variant"
+    say "     ${DIM}Create it with: tinybuilder --setup${RESET}"
   else
     bad "Missing Bonsai 2 4B"
     say "     ${DIM}ollama pull hf.co/prismml/bonsai-2:4b-q2_0${RESET}"
@@ -213,19 +213,19 @@ setup() {
 
   say ""
   say "${DIM}Bonsai ships with 262k context, which on 8 GB of RAM uses 12 GB and swaps to disk."
-  say "We create a 96k variant that fits without swapping:${RESET}"
+  say "We create a 16k variant that runs entirely on the GPU:${RESET}"
 
   local mf
   mf="$(mktemp)"
   cat > "$mf" <<'MODELFILE'
 FROM bonsai-2:4b-q2_0
-PARAMETER num_ctx 98304
+PARAMETER num_ctx 16384
 PARAMETER temperature 0.6
 PARAMETER top_p 0.9
 PARAMETER top_k 20
 PARAMETER presence_penalty 1
 MODELFILE
-  ollama create bonsai-2-4b-96k -f "$mf" && ok "bonsai-2-4b-96k created"
+  ollama create bonsai-2-4b-16k -f "$mf" && ok "bonsai-2-4b-16k created"
   rm -f "$mf"
 
   if [ ! -x "$ROOT/node_modules/.bin/little-coder" ]; then
@@ -261,9 +261,10 @@ fi
 
 [ -z "$OLLAMA_API_KEY" ] && export OLLAMA_API_KEY=noop
 
-# Las extensiones, skills y templates viven en este repo.
+# Las extensiones, skills, templates y modelos viven en este repo.
 export TINYBUILDER_HOME="$ROOT"
 export LITTLE_CODER_EXTENSIONS_DIR="$ROOT/extensions"
+export LITTLE_CODER_MODELS_FILE="$ROOT/models.json"
 
 if [ ! -d "$PROJECT" ]; then
   bad "Directory does not exist: $PROJECT"
@@ -272,4 +273,4 @@ fi
 
 cd "$PROJECT" || exit 1
 
-exec "$LC_BIN" --model ollama/bonsai-2-4b-96k "${ARGS[@]}"
+exec "$LC_BIN" --model ollama/bonsai-2-4b-16k "${ARGS[@]}"

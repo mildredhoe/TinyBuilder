@@ -12,7 +12,7 @@ Two models split the work by strength:
 
 | Role | Model | Why |
 |---|---|---|
-| **Thinks, decides, talks** | Bonsai 2 4B (96k context) | Long memory: it remembers the whole project |
+| **Thinks, decides, talks** | Bonsai 2 4B (16k context) | Fits entirely on the GPU |
 | **Writes the code** | Qwen3.5 0.8B | Far better at coding, even if it forgets context |
 
 Bonsai never writes code directly. It calls a `write_code` tool, and the extension asks Qwen for the file contents. You see the conversation; the code comes from the specialised model.
@@ -35,7 +35,13 @@ Plus a side panel with **FILES**, **PREVIEW** and **MEMORY** so you can watch th
 - Apple Silicon (M1 or newer). Recent Intel works, slower.
 - ~6 GB of disk for models and templates.
 
-> **Why 8 GB is enough:** Bonsai 4B at Q2 is 1.6 GB and Qwen 0.8B is 737 MB. We run a Bonsai variant with **96k context** instead of the stock 262k. At 262k the KV cache alone asks for **12 GB** on an 8 GB machine, and the system starts swapping to disk. At 96k, Bonsai uses **5.7 GB and 65% GPU**. That is the whole difference between slow-and-broken and working.
+> **Why 8 GB is enough:** Bonsai 4B at Q2 is 1.6 GB and Qwen 0.8B is 737 MB. Bonsai ships with 262k context, but the KV cache alone asks for **12 GB** on an 8 GB machine and the system swaps to disk. We run a **16k** variant instead: **2.2 GB, 100% GPU, no CPU offload**. That is the whole difference between slow-and-broken and working.
+>
+> | Variant | Context | RAM | GPU |
+> |---|---|---|---|
+> | stock | 262k | 12 GB (swapping) | 25% |
+> | 96k | 96k | 5.7 GB | 65% |
+> | **16k (default)** | **16k** | **2.2 GB** | **100%** |
 
 ### Software
 
@@ -57,7 +63,7 @@ npm install          # brings little-coder, the agent engine, into the project
 ./bin/tinybuilder --setup
 ```
 
-`--setup` pulls both models and creates the `bonsai-2-4b-96k` variant with the right context for 8 GB. It also runs `npm install` for you if the dependencies are missing.
+`--setup` pulls both models and creates the `bonsai-2-4b-16k` variant, sized to run entirely on the GPU. It also runs `npm install` for you if the dependencies are missing.
 
 **Everything the agent needs lives inside this folder.** `little-coder` is a normal dependency in `package.json`, installed under `node_modules/` — not a global tool you have to hunt down. The only outside pieces are Ollama and the model weights.
 
@@ -74,7 +80,7 @@ TinyBuilder — doctor
 
   ✓ Node v26.8.1
   ✓ Ollama running
-  ✓ Bonsai 2 4B 96k (main model)
+  ✓ Bonsai 2 4B 16k (main model)
   ✓ Qwen3.5 0.8B (writes the code)
   ✓ RAM: 8 GB
   ✓ little-coder installed
@@ -187,7 +193,7 @@ TinyBuilder/
 │   ├── frontend-design/   # visual direction (Anthropic)
 │   └── web-artifacts-builder/
 ├── templates/             # AstroWind + SaaS starter (bundled)
-├── models.json            # Bonsai 96k as the default model
+├── models.json            # Bonsai 16k as the default model
 ├── node_modules/          # little-coder + deps (npm install, not committed)
 ├── README.md
 └── package.json           # depends on little-coder
@@ -205,7 +211,7 @@ TinyBuilder/
 ## Troubleshooting
 
 **"The model is slow or the response cuts off"**
-Bonsai is paging to disk. Run `ollama ps` and check it says about 5.7 GB, not 12 GB. If it says 12 you are on the 262k variant — run `tinybuilder --setup` to create the 96k one.
+Bonsai is paging to disk. Run `ollama ps`: it should read about **2.2 GB and 100% GPU**. If it shows 12 GB or a CPU share, you are on a larger-context variant — run `tinybuilder --setup` to create the 16k one.
 
 **"The files come out broken"**
 The guard should have caught it. Press `ctrl+shift+c` and read the report. If the same file keeps failing, narrow the task to that file.
@@ -225,7 +231,7 @@ That pane is text-only by design. Use `/serve` and open the URL in a browser for
 
 A few choices are deliberate and worth knowing before you change them:
 
-- **96k, not 262k.** The larger context does not fit in 8 GB. Lowering it is the single biggest speed and stability win.
+- **16k, not 262k.** The larger context does not fit in 8 GB and forces CPU offload. 16k keeps the whole model on the GPU, which is the single biggest speed and stability win. Raise it only if you have RAM to spare.
 - **Bonsai never touches code.** Mixing a long-context model into code generation is what produces plausible-looking but broken files.
 - **Recipes over reasoning.** A 4B model cannot plan a whole app. Telling it exactly which stack and which files removes the improvisation where it fails.
 - **Checks in code, not in the model.** Asking a small model to verify its own output does not work. The guard verifies it instead and hands back the exact error.
