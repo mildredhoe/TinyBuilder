@@ -1,45 +1,45 @@
 # TinyBuilder
 
-**Construye sitios web y SaaS con modelos de lenguaje corriendo en tu MacBook — sin nube, sin cuotas, sin enviar tu código a nadie.**
+**Build websites and SaaS products with language models running on your own Mac — no cloud, no quotas, no code leaving your machine.**
 
-TinyBuilder está diseñado para un portátil con **8 GB de RAM compartida** (sin GPU dedicada). Nada aquí asume una máquina grande. Cada decisión está tomada para que dos modelos pequeños quepan en memoria y produzcan proyectos que compilan.
+TinyBuilder is built for a laptop with **8 GB of shared RAM** and no dedicated GPU. Nothing here assumes a big machine. Every decision exists so that two small models fit in memory and still produce projects that compile.
 
 ---
 
-## Cómo funciona
+## How it works
 
-Dos modelos trabajan juntos, cada uno en lo que es bueno:
+Two models split the work by strength:
 
-| Rol | Modelo | Por qué |
+| Role | Model | Why |
 |---|---|---|
-| **Piensa, decide, conversa** | Bonsai 2 4B (96k de contexto) | Memoria larga: recuerda todo el proyecto |
-| **Escribe el código** | Qwen3.5 0.8B | Mucho mejor codeando, aunque olvide contexto |
+| **Thinks, decides, talks** | Bonsai 2 4B (96k context) | Long memory: it remembers the whole project |
+| **Writes the code** | Qwen3.5 0.8B | Far better at coding, even if it forgets context |
 
-Bonsai nunca escribe código directamente: llama a una herramienta (`write_code`) y la extensión le pide el contenido a Qwen. Tú ves la conversación; el código sale del modelo especializado.
+Bonsai never writes code directly. It calls a `write_code` tool, and the extension asks Qwen for the file contents. You see the conversation; the code comes from the specialised model.
 
-Encima de eso hay tres capas que evitan el desastre típico de los modelos chicos:
+On top of that sit three layers that prevent the classic small-model disasters:
 
-1. **Recetas fijas** — cuando pides un sitio estático o un SaaS, se inyecta una receta con el stack cerrado, los archivos exactos y lo que está prohibido. El modelo sigue pasos en vez de improvisar.
-2. **Guard por archivo** — cada vez que el modelo escribe un archivo, se verifica al instante: sintaxis real, imports que existan, paquetes declarados, que no mezcle tecnologías. Si algo falla, el error vuelve al modelo con el archivo exacto y se corrige solo (máximo 2 intentos).
-3. **Revisión de proyecto** — al terminar cada turno se revisa todo el proyecto y se reporta lo que quedó roto, clasificado por tipo.
+1. **Fixed recipes** — when you ask for a static site or a SaaS, a recipe is injected with a locked stack, the exact file list, and what is forbidden. The model follows steps instead of improvising.
+2. **Per-file guard** — every time the model writes a file, it is checked instantly: real syntax, imports that resolve, declared packages, no mixed technologies. If something fails, the exact error goes back to the model with the exact file and it repairs itself (two attempts max).
+3. **Project review** — at the end of every turn the whole project is checked and whatever is broken is reported, classified by kind.
 
-Y un panel lateral con **FILES**, **PREVIEW** y **MEMORY** para ver qué se está creando en vivo.
+Plus a side panel with **FILES**, **PREVIEW** and **MEMORY** so you can watch the project being built live.
 
 ---
 
-## Qué necesita tu Mac
+## Requirements
 
 ### Hardware
 
-- **8 GB de RAM** como mínimo (es el objetivo de diseño).
-- Apple Silicon (M1 o superior) o Intel reciente.
-- ~6 GB de disco para modelos y templates.
+- **8 GB of RAM** minimum — this is the design target.
+- Apple Silicon (M1 or newer). Recent Intel works, slower.
+- ~6 GB of disk for models and templates.
 
-> **Por qué 8 GB alcanzan:** Bonsai 4B en Q2 ocupa 1.6 GB y Qwen 0.8B ocupa 737 MB. Usamos una variante de Bonsai con **96k de contexto** en lugar de los 262k originales: con 262k, la caché de contexto sola pide **12 GB** en una máquina de 8 y el sistema empieza a escribir a disco. A 96k, Bonsai usa **5.7 GB y 65 % de GPU**. Esa es toda la diferencia entre ir lento y funcionar.
+> **Why 8 GB is enough:** Bonsai 4B at Q2 is 1.6 GB and Qwen 0.8B is 737 MB. We run a Bonsai variant with **96k context** instead of the stock 262k. At 262k the KV cache alone asks for **12 GB** on an 8 GB machine, and the system starts swapping to disk. At 96k, Bonsai uses **5.7 GB and 65% GPU**. That is the whole difference between slow-and-broken and working.
 
 ### Software
 
-| Requisito | Cómo se instala | Verificar |
+| Requirement | Install | Verify |
 |---|---|---|
 | **Ollama** | `brew install --cask ollama` | `ollama --version` |
 | **Node.js ≥ 22.19** | `brew install node` | `node -v` |
@@ -49,158 +49,186 @@ Y un panel lateral con **FILES**, **PREVIEW** y **MEMORY** para ver qué se est�
 
 ---
 
-## Instalación
+## Install
 
 ```bash
-git clone <este-repo> ~/TinyBuilder
+git clone https://github.com/mildredhoe/TinyBuilder.git ~/TinyBuilder
 cd ~/TinyBuilder
 ./bin/tinybuilder --setup
 ```
 
-`--setup` descarga los dos modelos, crea la variante `bonsai-2-4b-96k` con el contexto correcto para 8 GB, e instala little-coder si falta.
+`--setup` pulls both models, creates the `bonsai-2-4b-96k` variant with the right context for 8 GB, and installs little-coder if it is missing.
 
-Luego verifica que todo esté en su lugar:
+Then confirm everything is in place:
 
 ```bash
 ./bin/tinybuilder --doctor
 ```
 
-Deberías ver algo así:
+You should see:
 
 ```
-TinyBuilder — diagnóstico
+TinyBuilder — doctor
 
   ✓ Node v26.8.1
-  ✓ Ollama corriendo
-  ✓ Bonsai 2 4B 96k (modelo principal)
-  ✓ Qwen3.5 0.8B (escribe el código)
+  ✓ Ollama running
+  ✓ Bonsai 2 4B 96k (main model)
+  ✓ Qwen3.5 0.8B (writes the code)
   ✓ RAM: 8 GB
-  ✓ little-coder instalado
+  ✓ little-coder installed
 ```
+
+> **Note on models:** the weights are not in this repo. They live in Ollama, come from Hugging Face, and carry their own licences. `--setup` downloads them for you.
 
 ---
 
-## Uso
+## Usage
 
 ```bash
-tinybuilder                 # abre el proyecto del directorio actual
-tinybuilder ~/mi-sitio      # abre ese proyecto
+tinybuilder                 # open the project in the current directory
+tinybuilder ~/my-site       # open that project
 ```
 
-Dentro de TinyBuilder:
+Inside TinyBuilder:
 
-| Comando | Qué hace |
+| Command | What it does |
 |---|---|
-| `/panel` | ocultar o mostrar el panel lateral |
-| `/serve` | levanta un servidor local y te da la URL del preview |
-| `/stop` | detiene el servidor |
-| `/check` | revisa la consistencia del proyecto ahora |
-| `alt+e` | edita el archivo abierto en el panel |
-| `ctrl+shift+c` | fuerza una revisión del proyecto |
-| doble click en PREVIEW | edita el archivo inline |
+| `/panel` | hide or show the side panel |
+| `/serve` | start a local server and print the preview URL |
+| `/stop` | stop that server |
+| `/check` | review the project right now |
+| `alt+e` | edit the file open in the panel |
+| `ctrl+shift+c` | force a project review |
+| double-click in PREVIEW | edit the file inline |
+
+### The panel
+
+- **FILES** — project tree. Click a file to select it, double-click to open it.
+- **PREVIEW** — the selected file. Double-click to edit it in place with a small inline editor (`Ctrl+S` saves, `Esc` cancels).
+- **MEMORY** — what the assistant has remembered about the project (`alt+m`).
+
+The mouse wheel scrolls whichever side the pointer is over.
 
 ---
 
 ## Templates
 
-Dos proyectos base, ya integrados y probados juntos. **No los reescribas: cópialos.**
+Two base projects, already wired together and tested. **Do not rewrite them — copy them.**
 
-| Template | Stack | Para qué |
+| Template | Stack | Use it for |
 |---|---|---|
-| **static-astrowind** | Astro 7 + Tailwind 4 | Sitios corporativos, blogs, landings. Basado en [AstroWind](https://github.com/arthelokyo/astrowind) (MIT). |
-| **saas-nextjs-starter** | Next 14 + better-auth + drizzle + **Whop** | SaaS con login, base de datos y suscripciones. |
+| **static-astrowind** | Astro 7 + Tailwind 4 | Corporate sites, blogs, landing pages. Based on [AstroWind](https://github.com/arthelokyo/astrowind) (MIT). |
+| **saas-nextjs-starter** | Next 14 + better-auth + drizzle + **Whop** | SaaS with login, database and subscriptions. |
 
-Los templates **vienen incluidos en el repo** (`templates/`), así que no hay que descargar nada aparte.
+Both ship **inside this repo** under `templates/`, so there is nothing extra to download.
 
 ```bash
-# ver los disponibles
+# list what is available
 tinybuilder --templates
 
-# usar uno como base (desde la raíz de tu proyecto nuevo)
+# start a new project from one (run from the new project's root)
 cp -R ~/TinyBuilder/templates/static-astrowind/. .
 ```
 
-### Pagos con Whop
+The assistant knows these paths. If you ask for a static site, it copies AstroWind; if you ask for a SaaS, it copies the Next starter. It will not build either from scratch.
 
-El template de SaaS usa **Whop** como *merchant of record*: cobra en su nombre, se encarga de impuestos y de los chargebacks.
+### Payments with Whop
 
-- `WHOP_API_KEY` — clave de la API
-- `WHOP_WEBHOOK_SECRET` — secreto para verificar la firma
-- `NEXT_PUBLIC_WHOP_PRODUCT_ID` — id del producto
+The SaaS template uses **Whop** as its *merchant of record*: Whop charges on your behalf and handles tax and chargebacks. That matters a lot for a solo builder in Chile — you do not have to register as a merchant abroad.
 
-**El acceso se otorga únicamente desde el webhook** (`payment.succeeded`), nunca desde el navegador. La firma se verifica con HMAC-SHA256 y comparación de tiempo constante. Esto no es opcional: es la diferencia entre un cobro seguro y una puerta abierta.
+- `WHOP_API_KEY` — API key
+- `WHOP_WEBHOOK_SECRET` — secret used to verify webhook signatures
+- `NEXT_PUBLIC_WHOP_PRODUCT_ID` — product id from the Whop dashboard
 
-> **Aviso legal:** el starter de SaaS original no incluye licencia. Si vas a publicar un producto sobre él, considera reescribir esa base con el mismo stack.
+**Access is granted only from the webhook** (`payment.succeeded`), never from the browser. The signature is verified with HMAC-SHA256 and a constant-time comparison. That is not optional — it is the difference between a safe charge and an open door.
 
----
-
-## Qué pedirle (y qué no)
-
-Un modelo de 4B rinde cuando las tareas son concretas y pequeñas. La regla es simple: **un archivo, un paso**.
-
-**Funciona bien:**
-```
-crea un sitio estático para un colegio en Maipú
-agrega una página de contacto al sitio
-arregla los imports de app/components
-crea un SaaS con login y suscripciones
-```
-
-**Falla (y no es culpa del modelo):**
-```
-hazme toda la aplicación completa de una vez
-refactoriza todo el proyecto
-```
-
-Si una tarea no avanza, acótala: nombra el archivo y el cambio exacto.
+> **Licence warning:** the original SaaS starter ships without a licence file, which means all rights reserved. If you plan to sell a product built on it, consider rewriting that base with the same stack.
 
 ---
 
-## Estructura del proyecto
+## What to ask for (and what not to)
+
+A 4B model delivers when tasks are concrete and small. The rule is simple: **one file, one step**.
+
+**Works well:**
+```
+create a static site for a school in Maipú
+add a contact page to the site
+fix the imports in app/components
+create a SaaS with login and subscriptions
+```
+
+**Fails (and it is not the model's fault):**
+```
+build me the whole application at once
+refactor the entire project
+```
+
+If a task stalls, narrow it: name the file and the exact change.
+
+---
+
+## Project layout
 
 ```
 TinyBuilder/
-├── bin/tinybuilder        # lanzador (run, --setup, --doctor, --templates)
+├── bin/tinybuilder        # launcher (run, --setup, --doctor, --templates)
 ├── extensions/
-│   ├── coder-split.ts     # Bonsai piensa · Qwen escribe
-│   ├── side-panel.ts      # FILES / PREVIEW / MEMORY con clicks y edición
-│   ├── file-guard.ts      # verifica cada archivo al escribirse
-│   ├── project-check.ts   # revisa el proyecto al terminar cada turno
-│   └── user-skills.ts     # inyecta las recetas correctas
+│   ├── coder-split.ts     # Bonsai thinks · Qwen writes
+│   ├── side-panel.ts      # FILES / PREVIEW / MEMORY, clicks and inline editing
+│   ├── file-guard.ts      # checks every file the moment it is written
+│   ├── project-check.ts   # reviews the project at the end of each turn
+│   └── user-skills.ts     # injects the matching recipes
 ├── skills/
-│   ├── sitio-estatico/    # receta: AstroWind, stack cerrado
-│   ├── saas/              # receta: Next + Whop, orden obligatorio
-│   ├── frontend-design/   # dirección visual (Anthropic)
+│   ├── sitio-estatico/    # recipe: AstroWind, locked stack
+│   ├── saas/              # recipe: Next + Whop, mandatory order
+│   ├── frontend-design/   # visual direction (Anthropic)
 │   └── web-artifacts-builder/
-├── templates/             # AstroWind + starter SaaS (incluidos)
-├── models.json            # Bonsai 96k como modelo por defecto
+├── templates/             # AstroWind + SaaS starter (bundled)
+├── models.json            # Bonsai 96k as the default model
+├── README.md
 └── package.json
 ```
 
-### Dónde vive cada cosa
+### Where things live
 
-- **Este repo** — todo: extensiones, skills, templates y lanzador. `TINYBUILDER_HOME` apunta acá.
-- **`~/.pi/agent/`** — sesiones y memoria. Compartido con otros agentes Pi.
-- **Ollama** — los modelos. Se descargan con `--setup` porque son de Hugging Face.
-
----
-
-## Problemas frecuentes
-
-**«El modelo tarda mucho o se corta»**
-Bonsai está paginando a disco. Verifica con `ollama ps` que diga ~5.7 GB y no 12 GB. Si dice 12, estás usando la variante de 262k: corre `tinybuilder --setup` para crear la de 96k.
-
-**«Los archivos salen rotos»**
-El guard debería atraparlo. Si no, corre `ctrl+shift+c` y mira el reporte. Si el error se repite en el mismo archivo, acota la tarea a ese archivo.
-
-**«No encuentra los templates»**
-`tinybuilder --templates` te dice la ruta real. Deberían estar en `<repo>/templates/`. Si moviste el repo, la ruta se recalcula sola.
-
-**«No hace nada / no responde»**
-Comprueba que Ollama esté corriendo: `tinybuilder --doctor`.
+- **This repo** — everything: extensions, skills, templates, launcher. `TINYBUILDER_HOME` points here.
+- **`~/.pi/agent/`** — sessions and memory. Shared with any other Pi agent you run.
+- **Ollama** — the model weights. Downloaded by `--setup`, because they are large and licensed separately.
 
 ---
 
-## Licencia
+## Troubleshooting
 
-MIT para este proyecto. Los templates conservan la licencia de sus autores originales.
+**"The model is slow or the response cuts off"**
+Bonsai is paging to disk. Run `ollama ps` and check it says about 5.7 GB, not 12 GB. If it says 12 you are on the 262k variant — run `tinybuilder --setup` to create the 96k one.
+
+**"The files come out broken"**
+The guard should have caught it. Press `ctrl+shift+c` and read the report. If the same file keeps failing, narrow the task to that file.
+
+**"It cannot find the templates"**
+`tinybuilder --templates` prints the real path. They should be under `<repo>/templates/`. The path is recomputed from the repo location, so moving the folder is safe.
+
+**"Nothing happens / no response"**
+Check Ollama is running: `tinybuilder --doctor`.
+
+**"The preview does not look right"**
+That pane is text-only by design. Use `/serve` and open the URL in a browser for the real thing.
+
+---
+
+## Design notes
+
+A few choices are deliberate and worth knowing before you change them:
+
+- **96k, not 262k.** The larger context does not fit in 8 GB. Lowering it is the single biggest speed and stability win.
+- **Bonsai never touches code.** Mixing a long-context model into code generation is what produces plausible-looking but broken files.
+- **Recipes over reasoning.** A 4B model cannot plan a whole app. Telling it exactly which stack and which files removes the improvisation where it fails.
+- **Checks in code, not in the model.** Asking a small model to verify its own output does not work. The guard verifies it instead and hands back the exact error.
+- **One file, one step.** Long JSX files are where small models collapse. Keep files small and tasks smaller.
+
+---
+
+## Licence
+
+MIT for this project. Bundled templates keep the licence of their original authors.
