@@ -117,11 +117,11 @@ check_ram() {
 }
 
 check_little_coder() {
-  if command -v little-coder >/dev/null 2>&1; then
-    ok "little-coder installed"
+  if [ -x "$ROOT/node_modules/.bin/little-coder" ]; then
+    ok "little-coder (bundled in this project)"
   else
-    bad "little-coder not installed"
-    say "     ${DIM}npm install -g little-coder${RESET}"
+    bad "little-coder missing from the project"
+    say "     ${DIM}cd \"$ROOT\" && npm install${RESET}"
   fi
 }
 
@@ -228,11 +228,11 @@ MODELFILE
   ollama create bonsai-2-4b-96k -f "$mf" && ok "bonsai-2-4b-96k created"
   rm -f "$mf"
 
-  if ! command -v little-coder >/dev/null 2>&1; then
-    warn "Installing little-coder..."
-    npm install -g little-coder || bad "Could not install little-coder"
+  if [ ! -x "$ROOT/node_modules/.bin/little-coder" ]; then
+    warn "Installing project dependencies..."
+    (cd "$ROOT" && npm install) || bad "Could not install dependencies"
   else
-    ok "little-coder already installed"
+    ok "Project dependencies already installed"
   fi
 
   say ""
@@ -249,6 +249,16 @@ case "$MODE" in
 esac
 
 # ── run ──────────────────────────────────────────────────────────────
+
+# little-coder viaja con el proyecto. Si falta, avisamos antes de fallar.
+LC_BIN="$ROOT/node_modules/.bin/little-coder"
+if [ ! -x "$LC_BIN" ]; then
+  bad "Falta little-coder dentro del proyecto."
+  say "     ${DIM}cd \"$ROOT\" && npm install${RESET}"
+  say "     ${DIM}o ejecuta: tinybuilder --setup${RESET}"
+  exit 1
+fi
+
 [ -z "$OLLAMA_API_KEY" ] && export OLLAMA_API_KEY=noop
 
 # Las extensiones, skills y templates viven en este repo.
@@ -262,4 +272,4 @@ fi
 
 cd "$PROJECT" || exit 1
 
-exec little-coder --model ollama/bonsai-2-4b-96k "${ARGS[@]}"
+exec "$LC_BIN" --model ollama/bonsai-2-4b-96k "${ARGS[@]}"

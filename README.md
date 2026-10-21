@@ -43,7 +43,6 @@ Plus a side panel with **FILES**, **PREVIEW** and **MEMORY** so you can watch th
 |---|---|---|
 | **Ollama** | `brew install --cask ollama` | `ollama --version` |
 | **Node.js ≥ 22.19** | `brew install node` | `node -v` |
-| **little-coder** | `npm install -g little-coder` | `little-coder --version` |
 | **Bonsai 2 4B** | `ollama pull hf.co/prismml/bonsai-2:4b-q2_0` | `ollama list` |
 | **Qwen3.5 0.8B** | `ollama pull hf.co/unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M` | `ollama list` |
 
@@ -54,10 +53,13 @@ Plus a side panel with **FILES**, **PREVIEW** and **MEMORY** so you can watch th
 ```bash
 git clone https://github.com/mildredhoe/TinyBuilder.git ~/TinyBuilder
 cd ~/TinyBuilder
+npm install          # brings little-coder, the agent engine, into the project
 ./bin/tinybuilder --setup
 ```
 
-`--setup` pulls both models, creates the `bonsai-2-4b-96k` variant with the right context for 8 GB, and installs little-coder if it is missing.
+`--setup` pulls both models and creates the `bonsai-2-4b-96k` variant with the right context for 8 GB. It also runs `npm install` for you if the dependencies are missing.
+
+**Everything the agent needs lives inside this folder.** `little-coder` is a normal dependency in `package.json`, installed under `node_modules/` — not a global tool you have to hunt down. The only outside pieces are Ollama and the model weights.
 
 Then confirm everything is in place:
 
@@ -186,13 +188,15 @@ TinyBuilder/
 │   └── web-artifacts-builder/
 ├── templates/             # AstroWind + SaaS starter (bundled)
 ├── models.json            # Bonsai 96k as the default model
+├── node_modules/          # little-coder + deps (npm install, not committed)
 ├── README.md
-└── package.json
+└── package.json           # depends on little-coder
 ```
 
 ### Where things live
 
 - **This repo** — everything: extensions, skills, templates, launcher. `TINYBUILDER_HOME` points here.
+- **`node_modules/`** — little-coder and its dependencies (~197 MB). Installed by `npm install`, not committed.
 - **`~/.pi/agent/`** — sessions and memory. Shared with any other Pi agent you run.
 - **Ollama** — the model weights. Downloaded by `--setup`, because they are large and licensed separately.
 
