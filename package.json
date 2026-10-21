@@ -1,0 +1,21 @@
+{
+  "name": "tinybuilder",
+  "version": "0.1.0",
+  "description": "Construye sitios y SaaS con modelos locales pequeños en un MacBook de 8 GB.",
+  "private": true,
+  "bin": {
+    "tinybuilder": "./bin/tinybuilder"
+  },
+  "scripts": {
+    "start": "./bin/tinybuilder",
+    "setup": "./bin/tinybuilder --setup",
+    "doctor": "./bin/tinybuilder --doctor"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "little-coder": "latest"
+  },
+  "license": "MIT"
+}

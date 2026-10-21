@@ -1,0 +1,31 @@
+{
+  "default": "ollama/bonsai-2-4b-96k",
+  "providers": {
+    "ollama": {
+      "api": "openai-completions",
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "apiKey": "OLLAMA_API_KEY",
+      "models": [
+        {
+          "id": "bonsai-2-4b-96k",
+          "name": "Bonsai 2 4B (96k, local)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 98304,
+          "maxTokens": 4096,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  },
+  "planModel": "ollama/bonsai-2-4b-96k",
+  "actionModel": "ollama/bonsai-2-4b-96k"
+}

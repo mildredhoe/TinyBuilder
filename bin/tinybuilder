@@ -1,0 +1,265 @@
+#!/bin/bash
+# TinyBuilder — construye sitios y SaaS con modelos locales pequeños.
+#
+# usage:
+#   tinybuilder [project-dir] [flags de little-coder...]
+#   tinybuilder --setup      configura todo desde cero
+#   tinybuilder --doctor     diagnostica el entorno
+#   tinybuilder --templates  lista los templates disponibles
+
+set -e
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Templates: primero los del repo (vienen incluidos), luego los globales.
+if [ -d "$ROOT/templates" ] && [ -n "$(ls -A "$ROOT/templates" 2>/dev/null)" ]; then
+  TEMPLATES_DIR="$ROOT/templates"
+else
+  TEMPLATES_DIR="${TINYBUILDER_TEMPLATES:-$HOME/.config/little-coder/templates}"
+fi
+PROJECT="$PWD"
+ARGS=()
+MODE="run"
+
+for arg in "$@"; do
+  case "$arg" in
+    --setup) MODE="setup" ;;
+    --doctor) MODE="doctor" ;;
+    --templates) MODE="templates" ;;
+    --help|-h) MODE="help" ;;
+    *)
+      if [ "$MODE" = "run" ] && [ $# -gt 0 ] && [ "${arg#-}" = "$arg" ] && [ -z "$PROJECT_SET" ]; then
+        PROJECT="$arg"
+        PROJECT_SET=1
+      else
+        ARGS+=("$arg")
+      fi
+      ;;
+  esac
+done
+
+# ── colores ──────────────────────────────────────────────────────────
+if [ -t 1 ]; then
+  BOLD="\033[1m"; DIM="\033[2m"; CYAN="\033[36m"; GREEN="\033[32m"
+  YELLOW="\033[33m"; RED="\033[31m"; RESET="\033[0m"
+else
+  BOLD=""; DIM=""; CYAN=""; GREEN=""; YELLOW=""; RED=""; RESET=""
+fi
+
+say()  { printf "%b\n" "$*"; }
+ok()   { printf "${GREEN}  ✓${RESET} %b\n" "$*"; }
+warn() { printf "${YELLOW}  !${RESET} %b\n" "$*"; }
+bad()  { printf "${RED}  ✗${RESET} %b\n" "$*"; }
+
+# ── doctor ───────────────────────────────────────────────────────────
+check_ollama() {
+  if command -v ollama >/dev/null 2>&1; then
+    if curl -s --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
+      ok "Ollama corriendo"
+      return 0
+    fi
+    warn "Ollama instalado pero no responde en :11434 (abre la app)"
+    return 1
+  fi
+  bad "Ollama no instalado"
+  say "     ${DIM}brew install --cask ollama${RESET}"
+  return 1
+}
+
+check_models() {
+  local list
+  list="$(ollama list 2>/dev/null || true)"
+
+  if printf '%s' "$list" | grep -q "bonsai-2-4b-96k"; then
+    ok "Bonsai 2 4B 96k (modelo principal)"
+  elif printf '%s' "$list" | grep -q "bonsai-2-4b"; then
+    warn "Bonsai presente sin la variante 96k"
+    say "     ${DIM}Ver README: crear con 'ollama create bonsai-2-4b-96k'${RESET}"
+  else
+    bad "Falta Bonsai 2 4B"
+    say "     ${DIM}ollama pull hf.co/prismml/bonsai-2:4b-q2_0${RESET}"
+  fi
+
+  if printf '%s' "$list" | grep -q "Qwen3.5-0.8B"; then
+    ok "Qwen3.5 0.8B (escribe el código)"
+  else
+    bad "Falta Qwen3.5 0.8B"
+    say "     ${DIM}ollama pull hf.co/unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M${RESET}"
+  fi
+}
+
+check_node() {
+  if command -v node >/dev/null 2>&1; then
+    local v
+    v="$(node -v)"
+    local major
+    major="$(printf '%s' "$v" | sed 's/^v//' | cut -d. -f1)"
+    if [ "$major" -ge 22 ]; then
+      ok "Node $v"
+    else
+      bad "Node $v es muy viejo (necesitas >= 22.19)"
+    fi
+  else
+    bad "Node no instalado"
+    say "     ${DIM}brew install node${RESET}"
+  fi
+}
+
+check_ram() {
+  local bytes gb
+  bytes="$(sysctl -n hw.memsize 2>/dev/null || echo 0)"
+  gb=$((bytes / 1073741824))
+  if [ "$gb" -ge 8 ]; then
+    ok "RAM: ${gb} GB"
+  else
+    warn "RAM: ${gb} GB — muy poca para este setup"
+  fi
+}
+
+check_little_coder() {
+  if command -v little-coder >/dev/null 2>&1; then
+    ok "little-coder instalado"
+  else
+    bad "little-coder no instalado"
+    say "     ${DIM}npm install -g little-coder${RESET}"
+  fi
+}
+
+doctor() {
+  say ""
+  say "${BOLD}${CYAN}TinyBuilder — diagnóstico${RESET}"
+  say ""
+  check_node
+  check_ollama || true
+  check_models
+  check_ram
+  check_little_coder
+  say ""
+  say "${DIM}Templates:${RESET}"
+  local tdir="$TEMPLATES_DIR"
+  if [ -d "$tdir" ]; then
+    for t in "$tdir"/*; do
+      [ -d "$t" ] && ok "$(basename "$t")"
+    done
+  else
+    warn "Sin templates instalados"
+  fi
+  say ""
+}
+
+templates() {
+  say ""
+  say "${BOLD}${CYAN}Templates${RESET}"
+  say ""
+  local dir="$TEMPLATES_DIR"
+  if [ ! -d "$dir" ]; then
+    warn "No hay templates en $dir"
+    say ""
+    return
+  fi
+  for t in "$dir"/*; do
+    [ -d "$t" ] || continue
+    local name
+    name="$(basename "$t")"
+    case "$name" in
+      static-astrowind) say "  ${CYAN}static-astrowind${RESET}   ${DIM}Astro 7 + Tailwind 4 (sitios, blogs)${RESET}" ;;
+      saas-nextjs-starter) say "  ${CYAN}saas-nextjs-starter${RESET} ${DIM}Next 14 + auth + drizzle + Whop${RESET}" ;;
+      *) say "  ${CYAN}$name${RESET}" ;;
+    esac
+  done
+  say ""
+  say "${DIM}Copia uno con:${RESET}"
+  say "  cp -R $dir/static-astrowind/. ."
+  say ""
+}
+
+help() {
+  say ""
+  say "${BOLD}TinyBuilder${RESET} ${DIM}— sitios y SaaS con modelos locales pequeños${RESET}"
+  say ""
+  say "  ${CYAN}tinybuilder${RESET}                abre en el directorio actual"
+  say "  ${CYAN}tinybuilder${RESET} ~/proyecto      abre ese proyecto"
+  say "  ${CYAN}tinybuilder${RESET} --setup        configura el entorno"
+  say "  ${CYAN}tinybuilder${RESET} --doctor       diagnostica qué falta"
+  say "  ${CYAN}tinybuilder${RESET} --templates    lista los templates"
+  say ""
+  say "${DIM}Dentro de TinyBuilder:${RESET}"
+  say "  /panel        ocultar/mostrar el panel lateral"
+  say "  /serve        servidor local y URL del preview"
+  say "  /stop         detener el servidor"
+  say "  /check        revisar consistencia del proyecto"
+  say "  alt+e         editar el archivo abierto"
+  say "  ctrl+shift+c  revisar el proyecto ahora"
+  say ""
+}
+
+setup() {
+  say ""
+  say "${BOLD}${CYAN}TinyBuilder — setup${RESET}"
+  say ""
+
+  if ! command -v ollama >/dev/null 2>&1; then
+    warn "Instalando Ollama..."
+    brew install --cask ollama || bad "No se pudo instalar Ollama"
+  else
+    ok "Ollama ya instalado"
+  fi
+
+  say "${DIM}Descargando Bonsai 2 4B (~1.6 GB)...${RESET}"
+  ollama pull hf.co/prismml/bonsai-2:4b-q2_0 || warn "No se pudo bajar Bonsai"
+
+  say "${DIM}Descargando Qwen3.5 0.8B (~737 MB)...${RESET}"
+  ollama pull hf.co/unsloth/Qwen3.5-0.8B-GGUF:Q4_K_M || warn "No se pudo bajar Qwen"
+
+  say ""
+  say "${DIM}Bonsai viene con 262k de contexto, que en 8 GB de RAM usa 12 GB y va a disco."
+  say "Creamos una variante de 96k que cabe sin swap:${RESET}"
+
+  local mf
+  mf="$(mktemp)"
+  cat > "$mf" <<'MODELFILE'
+FROM bonsai-2:4b-q2_0
+PARAMETER num_ctx 98304
+PARAMETER temperature 0.6
+PARAMETER top_p 0.9
+PARAMETER top_k 20
+PARAMETER presence_penalty 1
+MODELFILE
+  ollama create bonsai-2-4b-96k -f "$mf" && ok "bonsai-2-4b-96k creado"
+  rm -f "$mf"
+
+  if ! command -v little-coder >/dev/null 2>&1; then
+    warn "Instalando little-coder..."
+    npm install -g little-coder || bad "No se pudo instalar little-coder"
+  else
+    ok "little-coder ya instalado"
+  fi
+
+  say ""
+  say "${GREEN}Listo.${RESET} Ejecuta ${CYAN}tinybuilder --doctor${RESET} para verificar."
+  say ""
+}
+
+# ── dispatch ─────────────────────────────────────────────────────────
+case "$MODE" in
+  doctor) doctor; exit 0 ;;
+  templates) templates; exit 0 ;;
+  help) help; exit 0 ;;
+  setup) setup; exit 0 ;;
+esac
+
+# ── run ──────────────────────────────────────────────────────────────
+[ -z "$OLLAMA_API_KEY" ] && export OLLAMA_API_KEY=noop
+
+# Las extensiones, skills y templates viven en este repo.
+export TINYBUILDER_HOME="$ROOT"
+export LITTLE_CODER_EXTENSIONS_DIR="$ROOT/extensions"
+
+if [ ! -d "$PROJECT" ]; then
+  bad "No existe el directorio: $PROJECT"
+  exit 1
+fi
+
+cd "$PROJECT" || exit 1
+
+exec little-coder --model ollama/bonsai-2-4b-96k "${ARGS[@]}"
